@@ -1,20 +1,41 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import TaskInput from '../TaskInput'
 import TaskList from '../TaskList'
 import styles from './todoList.module.scss'
 import { Todo } from '../../@types/todo.type'
+
+interface HandleNewTodo {
+  (todos: Todo[]): Todo[]
+}
+
+const syncReactToLocal = (handleNewTodo: HandleNewTodo) => {
+  const todosString = localStorage.getItem('todos')
+  const todosObj: Todo[] = JSON.parse(todosString || '[]')
+  const newTodosObj = handleNewTodo(todosObj)
+  localStorage.setItem('todos', JSON.stringify(newTodosObj))
+}
+
 export default function TodoList() {
   const [todoList, setTodoList] = useState<Todo[]>([])
-
   const [currentTodo, setCurrentTodo] = useState<Todo | null>(null)
 
+  useEffect(() => {
+    const todoString = localStorage.getItem('todos')
+    const todosObj = JSON.parse(todoString || '[]')
+    setTodoList(todosObj)
+  }, [])
+
   const addTodo = (name: string) => {
+    const handler = (todosObj: Todo[]) => {
+      return [...todosObj, todo]
+    }
     const todo: Todo = {
       name,
       done: false,
       id: new Date().toISOString()
     }
     setTodoList((prev) => [...prev, todo])
+    syncReactToLocal(handler)
   }
 
   const handleDoneTodo = (id: string, done: boolean) => {
@@ -30,7 +51,6 @@ export default function TodoList() {
 
   const startEditTodo = (id: string) => {
     const findedTodo = todoList.find((todo) => todo.id === id)
-
     if (findedTodo) {
       setCurrentTodo(findedTodo)
     }
@@ -46,22 +66,26 @@ export default function TodoList() {
   }
 
   const finishEditTodo = () => {
-    setTodoList((prev) => {
-      return prev.map((todo) => {
+    const handler = (todosObj: Todo[]) => {
+      return todosObj.map((todo) => {
         if (todo.id === (currentTodo as Todo).id) {
           return currentTodo as Todo
         }
         return todo
       })
-    })
+    }
+    setTodoList(handler)
     setCurrentTodo(null)
+
+    // update localstorage
+    syncReactToLocal(handler)
   }
 
   const deleteTodo = (id: string) => {
     if (currentTodo) {
       setCurrentTodo(null)
     }
-    setTodoList((prev) => {
+    const handler = (prev: Todo[]) => {
       const findedIndexTodo = todoList.findIndex((todo) => todo.id === id)
       if (findedIndexTodo != -1) {
         const result = [...prev]
@@ -69,7 +93,9 @@ export default function TodoList() {
         return result
       }
       return prev
-    })
+    }
+    setTodoList(handler)
+    syncReactToLocal(handler)
   }
 
   return (
